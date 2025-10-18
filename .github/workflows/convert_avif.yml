@@ -11,8 +11,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
-      - name: 🛠️ Install libavif-bin (avifenc)
+      - name: 🛠️ Install libavif-bin
         run: |
           sudo apt-get update
           sudo apt-get install -y libavif-bin
@@ -26,10 +27,10 @@ jobs:
           done
 
           # Ensure README sections exist
-          if ! grep -q "## 待修改" README.md 2>/dev/null; then
+          if ! grep -q "^## 待修改$" README.md 2>/dev/null; then
             echo -e "\n## 待修改\n" >> README.md
           fi
-          if ! grep -q "## 完成" README.md 2>/dev/null; then
+          if ! grep -q "^## 完成$" README.md 2>/dev/null; then
             echo -e "\n## 完成\n" >> README.md
           fi
 
@@ -46,20 +47,20 @@ jobs:
           for img in "${image_files[@]}"; do
             [ -z "$img" ] && continue
             avif_file="${img%.*}.avif"
-            
+
             if [ -f "$avif_file" ]; then
-              echo "::notice::Skipping (already exists): $avif_file"
+              echo "::notice::Skipping (already exists): ${avif_file#./}"
               continue
             fi
 
             orig_size_kb=$(du -k "$img" | cut -f1)
             orig_size_mb=$(awk "BEGIN {printf \"%.1f\", $orig_size_kb/1024}")
 
-            echo "Converting: $img -> $avif_file"
+            echo "Converting: ${img#./} → ${avif_file#./}"
             avifenc --min 0 --max 30 --speed 0 "$img" "$avif_file"
 
             if [ ! -f "$avif_file" ]; then
-              echo "::error::Failed to convert $img"
+              echo "::error::Failed to convert ${img#./}"
               continue
             fi
 
@@ -76,24 +77,30 @@ jobs:
 
           if [ ${#converted_entries[@]} -gt 0 ]; then
             echo "::group::Updating README.md..."
-            awk '
-            /^## 待修改/ {
+            # Insert new entries right after "## 待修改"
+            awk -v new_entries="${converted_entries[*]}" '
+            /^## 待修改$/ {
               print $0
-              for (i in entries) print entries[i]
+              if (length(new_entries) > 0) {
+                split(new_entries, arr, "\n")
+                for (i in arr) if (length(arr[i]) > 0) print arr[i]
+              }
               next
             }
             { print }
-            ' entries="${converted_entries[*]}" README.md > README.md.tmp && mv README.md.tmp README.md
+            ' README.md > README.md.tmp && mv README.md.tmp README.md
             echo "::notice::Added ${#converted_entries[@]} entries to README.md"
             echo "::endgroup::"
           fi
 
       - name: 📤 Commit changes
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           if ! git diff --staged --quiet; then
             git commit -m "feat: add new AVIF conversions to README"
             git push
+          else
+            echo "No changes to commit."
           fi

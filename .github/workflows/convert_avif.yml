@@ -92,12 +92,11 @@ jobs:
           PENDING_SECTION=""
           while IFS='|' read -r orig avif orig_size avif_size; do
             # 转换字节为可读格式
-            orig_readable=$(numfmt --to=iec-i --suffix=B $orig_size)
-            avif_readable=$(numfmt --to=iec-i --suffix=B $avif_size)
+            orig_readable=$(echo "$orig_size" | numfmt --to=iec-i --suffix=B)
+            avif_readable=$(echo "$avif_size" | numfmt --to=iec-i --suffix=B)
             
             # 添加换行符
             PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})"
-
           done < converted_files.txt
           
           # 检查 README 是否存在

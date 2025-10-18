@@ -13,7 +13,7 @@ jobs:
       - name: 🛠️ Install libavif-tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libavif-tools
+          sudo apt-get install -y libavif-bin 
 
       - name: 🔍 Find and convert images
         id: convert

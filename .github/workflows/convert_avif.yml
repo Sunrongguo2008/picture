@@ -97,7 +97,7 @@ jobs:
             
             # 添加换行符
             PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})
-"
+
           done < converted_files.txt
           
           # 检查 README 是否存在

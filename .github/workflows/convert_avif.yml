@@ -88,23 +88,29 @@ jobs:
             exit 0
           fi
           
-          # 准备待修改区内容
-          PENDING_SECTION=""
-          while IFS='|' read -r orig avif orig_size avif_size; do
-            # 转换字节为可读格式
-            orig_readable=$(numfmt --to=iec-i --suffix=B $orig_size)
-            avif_readable=$(numfmt --to=iec-i --suffix=B $avif_size)
-            
-            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})"$'\n'
-          done < converted_files.txt
-          
           # 检查 README 是否存在
           if [ ! -f README.md ]; then
-            echo "# Image Conversion Status" > README.md
-            echo "" >> README.md
-            echo "## 待修改" >> README.md
-            echo "$PENDING_SECTION" >> README.md
-            echo "## 完成" >> README.md
+            cat > create_readme.py << 'EOF'
+            with open('converted_files.txt', 'r', encoding='utf-8') as f:
+                items = []
+                for line in f:
+                    parts = line.strip().split('|')
+                    if len(parts) == 4:
+                        orig, avif, orig_size, avif_size = parts
+                        orig_size_int = int(orig_size)
+                        avif_size_int = int(avif_size)
+                        orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
+                        avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
+                        items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
+            
+            with open('README.md', 'w', encoding='utf-8') as f:
+                f.write("# Image Conversion Status\n\n")
+                f.write("## 待修改\n")
+                for item in items:
+                    f.write(item + "\n")
+                f.write("\n## 完成\n")
+            EOF
+            python3 create_readme.py
           else
             # 检查是否已有"待修改"区域
             if grep -q "## 待修改" README.md; then
@@ -139,12 +145,26 @@ jobs:
               EOF
               python3 update_readme_add.py
             else
-              # 添加新区域
-              echo "" >> README.md
-              echo "## 待修改" >> README.md
-              echo "$PENDING_SECTION" >> README.md
-              echo "" >> README.md
-              echo "## 完成" >> README.md
+              cat > create_sections.py << 'EOF'
+              with open('converted_files.txt', 'r', encoding='utf-8') as f:
+                  items = []
+                  for line in f:
+                      parts = line.strip().split('|')
+                      if len(parts) == 4:
+                          orig, avif, orig_size, avif_size = parts
+                          orig_size_int = int(orig_size)
+                          avif_size_int = int(avif_size)
+                          orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
+                          avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
+                          items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
+              
+              with open('README.md', 'a', encoding='utf-8') as f:
+                  f.write("\n## 待修改\n")
+                  for item in items:
+                      f.write(item + "\n")
+                  f.write("\n## 完成\n")
+              EOF
+              python3 create_sections.py
             fi
           fi
       

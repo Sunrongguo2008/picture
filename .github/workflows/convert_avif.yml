@@ -6,6 +6,8 @@ on:
 jobs:
   convert:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
       - name: Checkout repository
@@ -29,8 +31,22 @@ jobs:
             EXCLUDE_ARGS="$EXCLUDE_ARGS -path './$dir' -prune -o"
           done
           
-          # 查找所有图片文件
-          find . $EXCLUDE_ARGS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -print | while read -r file; do
+          # 查找所有图片文件并保存到临时文件
+          find . $EXCLUDE_ARGS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -print > all_images.txt
+          
+          total=$(wc -l < all_images.txt)
+          current=0
+          
+          if [ "$total" -eq 0 ]; then
+            echo "未找到需要转换的图片文件"
+            exit 0
+          fi
+          
+          echo "找到 $total 个图片文件"
+          
+          # 转换图片
+          while read -r file; do
+            current=$((current + 1))
             dir=$(dirname "$file")
             base=$(basename "$file")
             name="${base%.*}"
@@ -38,17 +54,27 @@ jobs:
             
             # 跳过已存在的 avif 文件
             if [ -f "$avif_file" ]; then
-              echo "跳过: $avif_file 已存在"
+              echo "[$current/$total] 跳过: $avif_file 已存在"
               continue
             fi
             
-            echo "转换: $file -> $avif_file"
+            echo "[$current/$total] 转换中: $file -> $avif_file"
             avifenc --min 0 --max 30 --speed 0 "$file" "$avif_file"
             
             if [ $? -eq 0 ]; then
               echo "$file|$avif_file" >> converted_files.txt
+              echo "[$current/$total] ✓ 完成"
+            else
+              echo "[$current/$total] ✗ 失败"
             fi
-          done
+          done < all_images.txt
+          
+          if [ -f converted_files.txt ]; then
+            converted_count=$(wc -l < converted_files.txt)
+            echo "========================================="
+            echo "转换完成: $converted_count/$total 个文件"
+            echo "========================================="
+          fi
       
       - name: Update README
         run: |

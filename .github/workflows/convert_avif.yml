@@ -91,6 +91,11 @@ jobs:
           # 准备待修改区内容
           PENDING_SECTION=""
           while IFS='|' read -r orig avif orig_size avif_size; do
+            # 跳过空行
+            if [ -z "$orig" ] || [ -z "$orig_size" ]; then
+              continue
+            fi
+            
             # 转换字节为可读格式
             orig_readable=$(echo "$orig_size" | numfmt --to=iec-i --suffix=B)
             avif_readable=$(echo "$avif_size" | numfmt --to=iec-i --suffix=B)

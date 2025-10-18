@@ -58,11 +58,16 @@ jobs:
               continue
             fi
             
+            # 获取原文件大小
+            orig_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+            
             echo "[$current/$total] 转换中: $file -> $avif_file"
             avifenc --min 0 --max 30 --speed 0 "$file" "$avif_file"
             
             if [ $? -eq 0 ]; then
-              echo "$file|$avif_file" >> converted_files.txt
+              # 获取转换后文件大小
+              avif_size=$(stat -f%z "$avif_file" 2>/dev/null || stat -c%s "$avif_file" 2>/dev/null)
+              echo "$file|$avif_file|$orig_size|$avif_size" >> converted_files.txt
               echo "[$current/$total] ✓ 完成"
             else
               echo "[$current/$total] ✗ 失败"
@@ -85,8 +90,48 @@ jobs:
           
           # 准备待修改区内容
           PENDING_SECTION=""
-          while IFS='|' read -r orig avif; do
-            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` -> \`${avif}\`"$'\n'
+          while IFS='|' read -r orig avif orig_size avif_size; do
+            # 转换字节为可读格式
+            orig_readable=$(numfmt --to=iec-i --suffix=B $orig_size)
+            avif_readable=$(numfmt --to=iec-i --suffix=B $avif_size)
+            
+            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})"
+          
+          # 检查 README 是否存在
+          if [ ! -f README.md ]; then
+            echo "# Image Conversion Status" > README.md
+            echo "" >> README.md
+            echo "## 待修改" >> README.md
+            echo "$PENDING_SECTION" >> README.md
+            echo "" >> README.md
+            echo "## 完成" >> README.md
+          else
+            # 检查是否已有"待修改"区域
+            if grep -q "## 待修改" README.md; then
+              # 在"待修改"区域后插入新内容
+              awk -v new="$PENDING_SECTION" '
+                /## 待修改/ { print; getline; print; print new; next }
+                { print }
+              ' README.md > README.md.tmp
+              mv README.md.tmp README.md
+            else
+              # 添加新区域
+              echo "" >> README.md
+              echo "## 待修改" >> README.md
+              echo "$PENDING_SECTION" >> README.md
+              echo "" >> README.md
+              echo "## 完成" >> README.md
+            fi
+          fi
+      
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --staged --quiet || git commit -m "Convert images to AVIF format"
+          git push
+\n'
           done < converted_files.txt
           
           # 检查 README 是否存在

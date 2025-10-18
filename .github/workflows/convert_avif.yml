@@ -108,34 +108,35 @@ jobs:
           else
             # 检查是否已有"待修改"区域
             if grep -q "## 待修改" README.md; then
-              # 使用 Python 处理 README 更新
-              cat > update_readme_add.py << 'PYTHON_SCRIPT'
-import sys
-
-with open('README.md', 'r', encoding='utf-8') as f:
-    lines = f.readlines()
-
-with open('converted_files.txt', 'r', encoding='utf-8') as f:
-    new_items = []
-    for line in f:
-        parts = line.strip().split('|')
-        if len(parts) == 4:
-            orig, avif, orig_size, avif_size = parts
-            orig_readable = f"{int(orig_size) / 1024 / 1024:.2f}MB" if int(orig_size) > 1024*1024 else f"{int(orig_size) / 1024:.2f}KB"
-            avif_readable = f"{int(avif_size) / 1024 / 1024:.2f}MB" if int(avif_size) > 1024*1024 else f"{int(avif_size) / 1024:.2f}KB"
-            new_items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})\n")
-
-new_lines = []
-added = False
-for i, line in enumerate(lines):
-    new_lines.append(line)
-    if line.strip() == '## 待修改' and not added:
-        new_lines.extend(new_items)
-        added = True
-
-with open('README.md', 'w', encoding='utf-8') as f:
-    f.writelines(new_lines)
-PYTHON_SCRIPT
+              cat > update_readme_add.py << 'EOF'
+              import sys
+              
+              with open('README.md', 'r', encoding='utf-8') as f:
+                  lines = f.readlines()
+              
+              with open('converted_files.txt', 'r', encoding='utf-8') as f:
+                  new_items = []
+                  for line in f:
+                      parts = line.strip().split('|')
+                      if len(parts) == 4:
+                          orig, avif, orig_size, avif_size = parts
+                          orig_size_int = int(orig_size)
+                          avif_size_int = int(avif_size)
+                          orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
+                          avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
+                          new_items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})\n")
+              
+              new_lines = []
+              added = False
+              for i, line in enumerate(lines):
+                  new_lines.append(line)
+                  if line.strip() == '## 待修改' and not added:
+                      new_lines.extend(new_items)
+                      added = True
+              
+              with open('README.md', 'w', encoding='utf-8') as f:
+                  f.writelines(new_lines)
+              EOF
               python3 update_readme_add.py
             else
               # 添加新区域

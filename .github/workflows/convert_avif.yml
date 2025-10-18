@@ -22,16 +22,13 @@ jobs:
       
       - name: Find and convert images
         run: |
-          # 排除的目录
           EXCLUDED_DIRS=(".git" ".github" "node_modules" ".npm" ".cache")
           
-          # 构建 find 排除参数
           EXCLUDE_ARGS=""
           for dir in "${EXCLUDED_DIRS[@]}"; do
             EXCLUDE_ARGS="$EXCLUDE_ARGS -path './$dir' -prune -o"
           done
           
-          # 查找所有图片文件并保存到临时文件
           eval "find . $EXCLUDE_ARGS -type f \( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \) -print" > all_images.txt
           
           total=$(wc -l < all_images.txt)
@@ -44,7 +41,6 @@ jobs:
           
           echo "找到 $total 个图片文件"
           
-          # 转换图片
           while read -r file; do
             current=$((current + 1))
             dir=$(dirname "$file")
@@ -52,20 +48,17 @@ jobs:
             name="${base%.*}"
             avif_file="$dir/$name.avif"
             
-            # 跳过已存在的 avif 文件
             if [ -f "$avif_file" ]; then
               echo "[$current/$total] 跳过: $avif_file 已存在"
               continue
             fi
             
-            # 获取原文件大小 (Ubuntu 使用 stat -c%s)
             orig_size=$(stat -c%s "$file")
             
             echo "[$current/$total] 转换中: $file -> $avif_file"
             avifenc --min 0 --max 30 --speed 0 "$file" "$avif_file"
             
             if [ $? -eq 0 ]; then
-              # 获取转换后文件大小
               avif_size=$(stat -c%s "$avif_file")
               echo "$file|$avif_file|$orig_size|$avif_size" >> converted_files.txt
               echo "[$current/$total] ✓ 完成"
@@ -88,82 +81,78 @@ jobs:
             exit 0
           fi
           
-          # 检查 README 是否存在
           if [ ! -f README.md ]; then
             cat > create_readme.py << 'EOF'
-            with open('converted_files.txt', 'r', encoding='utf-8') as f:
-                items = []
-                for line in f:
-                    parts = line.strip().split('|')
-                    if len(parts) == 4:
-                        orig, avif, orig_size, avif_size = parts
-                        orig_size_int = int(orig_size)
-                        avif_size_int = int(avif_size)
-                        orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
-                        avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
-                        items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
-            
-            with open('README.md', 'w', encoding='utf-8') as f:
-                f.write("# Image Conversion Status\n\n")
-                f.write("## 待修改\n")
-                for item in items:
-                    f.write(item + "\n")
-                f.write("\n## 完成\n")
-            EOF
+with open('converted_files.txt', 'r', encoding='utf-8') as f:
+    items = []
+    for line in f:
+        parts = line.strip().split('|')
+        if len(parts) == 4:
+            orig, avif, orig_size, avif_size = parts
+            orig_size_int = int(orig_size)
+            avif_size_int = int(avif_size)
+            orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
+            avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
+            items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
+
+with open('README.md', 'w', encoding='utf-8') as f:
+    f.write("# Image Conversion Status\n\n")
+    f.write("## 待修改\n")
+    for item in items:
+        f.write(item + "\n")
+    f.write("\n## 完成\n")
+EOF
             python3 create_readme.py
           else
-            # 检查是否已有"待修改"区域
             if grep -q "## 待修改" README.md; then
               cat > update_readme_add.py << 'EOF'
-              import sys
-              
-              with open('README.md', 'r', encoding='utf-8') as f:
-                  lines = f.readlines()
-              
-              with open('converted_files.txt', 'r', encoding='utf-8') as f:
-                  new_items = []
-                  for line in f:
-                      parts = line.strip().split('|')
-                      if len(parts) == 4:
-                          orig, avif, orig_size, avif_size = parts
-                          orig_size_int = int(orig_size)
-                          avif_size_int = int(avif_size)
-                          orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
-                          avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
-                          new_items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})\n")
-              
-              new_lines = []
-              added = False
-              for i, line in enumerate(lines):
-                  new_lines.append(line)
-                  if line.strip() == '## 待修改' and not added:
-                      new_lines.extend(new_items)
-                      added = True
-              
-              with open('README.md', 'w', encoding='utf-8') as f:
-                  f.writelines(new_lines)
-              EOF
+with open('README.md', 'r', encoding='utf-8') as f:
+    lines = f.readlines()
+
+with open('converted_files.txt', 'r', encoding='utf-8') as f:
+    new_items = []
+    for line in f:
+        parts = line.strip().split('|')
+        if len(parts) == 4:
+            orig, avif, orig_size, avif_size = parts
+            orig_size_int = int(orig_size)
+            avif_size_int = int(avif_size)
+            orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
+            avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
+            new_items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})\n")
+
+new_lines = []
+added = False
+for i, line in enumerate(lines):
+    new_lines.append(line)
+    if line.strip() == '## 待修改' and not added:
+        new_lines.extend(new_items)
+        added = True
+
+with open('README.md', 'w', encoding='utf-8') as f:
+    f.writelines(new_lines)
+EOF
               python3 update_readme_add.py
             else
               cat > create_sections.py << 'EOF'
-              with open('converted_files.txt', 'r', encoding='utf-8') as f:
-                  items = []
-                  for line in f:
-                      parts = line.strip().split('|')
-                      if len(parts) == 4:
-                          orig, avif, orig_size, avif_size = parts
-                          orig_size_int = int(orig_size)
-                          avif_size_int = int(avif_size)
-                          orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
-                          avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
-                          items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
-              
-              with open('README.md', 'a', encoding='utf-8') as f:
-                  f.write("\n## 待修改\n")
-                  for item in items:
-                      f.write(item + "\n")
-                  f.write("\n## 完成\n")
-              EOF
+with open('converted_files.txt', 'r', encoding='utf-8') as f:
+    items = []
+    for line in f:
+        parts = line.strip().split('|')
+        if len(parts) == 4:
+            orig, avif, orig_size, avif_size = parts
+            orig_size_int = int(orig_size)
+            avif_size_int = int(avif_size)
+            orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
+            avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
+            items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
+
+with open('README.md', 'a', encoding='utf-8') as f:
+    f.write("\n## 待修改\n")
+    for item in items:
+        f.write(item + "\n")
+    f.write("\n## 完成\n")
+EOF
               python3 create_sections.py
             fi
           fi

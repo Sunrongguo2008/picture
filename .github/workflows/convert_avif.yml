@@ -95,12 +95,8 @@ jobs:
 
       - name: 📤 Commit changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          if ! git diff --staged --quiet; then
-            git commit -m "feat: add new AVIF conversions to README"
-            git push
-          else
-            echo "No changes to commit."
-          fi
+          git diff --staged --quiet || git commit -m "Convert images to AVIF format"
+          git push

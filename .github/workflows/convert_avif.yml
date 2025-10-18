@@ -9,16 +9,16 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🛠️ Install libavif-tools
+      - name: 🛠️ Install libavif-bin (avifenc)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libavif-bin 
+          sudo apt-get install -y libavif-bin
 
       - name: 🔍 Find and convert images
-        id: convert
         run: |
-          # Define excluded directories (space-separated)
           EXCLUDE_DIRS=".git .github node_modules .npm .cache"
           EXCLUDE_PATTERN=""
           for dir in $EXCLUDE_DIRS; do
@@ -26,10 +26,10 @@ jobs:
           done
 
           # Ensure README sections exist
-          if ! grep -q "## 待修改" README.md; then
+          if ! grep -q "## 待修改" README.md 2>/dev/null; then
             echo -e "\n## 待修改\n" >> README.md
           fi
-          if ! grep -q "## 完成" README.md; then
+          if ! grep -q "## 完成" README.md 2>/dev/null; then
             echo -e "\n## 完成\n" >> README.md
           fi
 
@@ -47,17 +47,14 @@ jobs:
             [ -z "$img" ] && continue
             avif_file="${img%.*}.avif"
             
-            # Skip if .avif already exists
             if [ -f "$avif_file" ]; then
               echo "::notice::Skipping (already exists): $avif_file"
               continue
             fi
 
-            # Get original size
             orig_size_kb=$(du -k "$img" | cut -f1)
             orig_size_mb=$(awk "BEGIN {printf \"%.1f\", $orig_size_kb/1024}")
 
-            # Convert
             echo "Converting: $img -> $avif_file"
             avifenc --min 0 --max 30 --speed 0 "$img" "$avif_file"
 
@@ -66,24 +63,19 @@ jobs:
               continue
             fi
 
-            # Get new size
             new_size_kb=$(du -k "$avif_file" | cut -f1)
             new_size_mb=$(awk "BEGIN {printf \"%.1f\", $new_size_kb/1024}")
 
-            # Format path for markdown (remove leading ./)
             rel_img="${img#./}"
             rel_avif="${avif_file#./}"
-
             entry="- [ ] \`${rel_img}\`(${orig_size_mb}MB) -> \`${rel_avif}\`(${new_size_mb}MB)"
             converted_entries+=("$entry")
             echo "::notice::Converted: $rel_img → $rel_avif (${orig_size_mb}MB → ${new_size_mb}MB)"
           done
           echo "::endgroup::"
 
-          # Append to README.md under "## 待修改"
           if [ ${#converted_entries[@]} -gt 0 ]; then
             echo "::group::Updating README.md..."
-            # Insert entries just after "## 待修改"
             awk '
             /^## 待修改/ {
               print $0
@@ -94,18 +86,14 @@ jobs:
             ' entries="${converted_entries[*]}" README.md > README.md.tmp && mv README.md.tmp README.md
             echo "::notice::Added ${#converted_entries[@]} entries to README.md"
             echo "::endgroup::"
-          else
-            echo "::notice::No new conversions performed."
           fi
 
-      - name: 📤 Commit changes (if any)
+      - name: 📤 Commit changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
+          if ! git diff --staged --quiet; then
             git commit -m "feat: add new AVIF conversions to README"
             git push
           fi

@@ -1,4 +1,4 @@
-name: Convert Images to AVIF
+name: 🖼️ Convert Images to AVIF (Manual)
 
 on:
   workflow_dispatch:
@@ -6,161 +6,106 @@ on:
 jobs:
   convert:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Install libavif tools
+
+      - name: 🛠️ Install libavif-tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libavif-bin
-      
-      - name: Find and convert images
+          sudo apt-get install -y libavif-tools
+
+      - name: 🔍 Find and convert images
+        id: convert
         run: |
-          EXCLUDED_DIRS=(".git" ".github" "node_modules" ".npm" ".cache")
-          
-          EXCLUDE_ARGS=""
-          for dir in "${EXCLUDED_DIRS[@]}"; do
-            EXCLUDE_ARGS="$EXCLUDE_ARGS -path './$dir' -prune -o"
+          # Define excluded directories (space-separated)
+          EXCLUDE_DIRS=".git .github node_modules .npm .cache"
+          EXCLUDE_PATTERN=""
+          for dir in $EXCLUDE_DIRS; do
+            EXCLUDE_PATTERN="$EXCLUDE_PATTERN -not -path './$dir/*'"
           done
-          
-          eval "find . $EXCLUDE_ARGS -type f \( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \) -print" > all_images.txt
-          
-          total=$(wc -l < all_images.txt)
-          current=0
-          
-          if [ "$total" -eq 0 ]; then
-            echo "未找到需要转换的图片文件"
+
+          # Ensure README sections exist
+          if ! grep -q "## 待修改" README.md; then
+            echo -e "\n## 待修改\n" >> README.md
+          fi
+          if ! grep -q "## 完成" README.md; then
+            echo -e "\n## 完成\n" >> README.md
+          fi
+
+          # Find image files
+          mapfile -d '' image_files < <(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) $EXCLUDE_PATTERN -print0)
+
+          if [ ${#image_files[@]} -eq 0 ]; then
+            echo "::notice::No images found to convert."
             exit 0
           fi
-          
-          echo "找到 $total 个图片文件"
-          
-          while read -r file; do
-            current=$((current + 1))
-            dir=$(dirname "$file")
-            base=$(basename "$file")
-            name="${base%.*}"
-            avif_file="$dir/$name.avif"
+
+          echo "::group::Converting images..."
+          converted_entries=()
+          for img in "${image_files[@]}"; do
+            [ -z "$img" ] && continue
+            avif_file="${img%.*}.avif"
             
+            # Skip if .avif already exists
             if [ -f "$avif_file" ]; then
-              echo "[$current/$total] 跳过: $avif_file 已存在"
+              echo "::notice::Skipping (already exists): $avif_file"
               continue
             fi
-            
-            orig_size=$(stat -c%s "$file")
-            
-            echo "[$current/$total] 转换中: $file -> $avif_file"
-            avifenc --min 0 --max 30 --speed 0 "$file" "$avif_file"
-            
-            if [ $? -eq 0 ]; then
-              avif_size=$(stat -c%s "$avif_file")
-              echo "$file|$avif_file|$orig_size|$avif_size" >> converted_files.txt
-              echo "[$current/$total] ✓ 完成"
-            else
-              echo "[$current/$total] ✗ 失败"
-            fi
-          done < all_images.txt
-          
-          if [ -f converted_files.txt ]; then
-            converted_count=$(wc -l < converted_files.txt)
-            echo "========================================="
-            echo "转换完成: $converted_count/$total 个文件"
-            echo "========================================="
-          fi
-      
-      - name: Update README
-        run: |
-          if [ ! -f converted_files.txt ]; then
-            echo "没有文件需要转换"
-            exit 0
-          fi
-          
-          if [ ! -f README.md ]; then
-            cat > create_readme.py << 'EOF'
-with open('converted_files.txt', 'r', encoding='utf-8') as f:
-    items = []
-    for line in f:
-        parts = line.strip().split('|')
-        if len(parts) == 4:
-            orig, avif, orig_size, avif_size = parts
-            orig_size_int = int(orig_size)
-            avif_size_int = int(avif_size)
-            orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
-            avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
-            items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
 
-with open('README.md', 'w', encoding='utf-8') as f:
-    f.write("# Image Conversion Status\n\n")
-    f.write("## 待修改\n")
-    for item in items:
-        f.write(item + "\n")
-    f.write("\n## 完成\n")
-EOF
-            python3 create_readme.py
+            # Get original size
+            orig_size_kb=$(du -k "$img" | cut -f1)
+            orig_size_mb=$(awk "BEGIN {printf \"%.1f\", $orig_size_kb/1024}")
+
+            # Convert
+            echo "Converting: $img -> $avif_file"
+            avifenc --min 0 --max 30 --speed 0 "$img" "$avif_file"
+
+            if [ ! -f "$avif_file" ]; then
+              echo "::error::Failed to convert $img"
+              continue
+            fi
+
+            # Get new size
+            new_size_kb=$(du -k "$avif_file" | cut -f1)
+            new_size_mb=$(awk "BEGIN {printf \"%.1f\", $new_size_kb/1024}")
+
+            # Format path for markdown (remove leading ./)
+            rel_img="${img#./}"
+            rel_avif="${avif_file#./}"
+
+            entry="- [ ] \`${rel_img}\`(${orig_size_mb}MB) -> \`${rel_avif}\`(${new_size_mb}MB)"
+            converted_entries+=("$entry")
+            echo "::notice::Converted: $rel_img → $rel_avif (${orig_size_mb}MB → ${new_size_mb}MB)"
+          done
+          echo "::endgroup::"
+
+          # Append to README.md under "## 待修改"
+          if [ ${#converted_entries[@]} -gt 0 ]; then
+            echo "::group::Updating README.md..."
+            # Insert entries just after "## 待修改"
+            awk '
+            /^## 待修改/ {
+              print $0
+              for (i in entries) print entries[i]
+              next
+            }
+            { print }
+            ' entries="${converted_entries[*]}" README.md > README.md.tmp && mv README.md.tmp README.md
+            echo "::notice::Added ${#converted_entries[@]} entries to README.md"
+            echo "::endgroup::"
           else
-            if grep -q "## 待修改" README.md; then
-              cat > update_readme_add.py << 'EOF'
-with open('README.md', 'r', encoding='utf-8') as f:
-    lines = f.readlines()
-
-with open('converted_files.txt', 'r', encoding='utf-8') as f:
-    new_items = []
-    for line in f:
-        parts = line.strip().split('|')
-        if len(parts) == 4:
-            orig, avif, orig_size, avif_size = parts
-            orig_size_int = int(orig_size)
-            avif_size_int = int(avif_size)
-            orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
-            avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
-            new_items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})\n")
-
-new_lines = []
-added = False
-for i, line in enumerate(lines):
-    new_lines.append(line)
-    if line.strip() == '## 待修改' and not added:
-        new_lines.extend(new_items)
-        added = True
-
-with open('README.md', 'w', encoding='utf-8') as f:
-    f.writelines(new_lines)
-EOF
-              python3 update_readme_add.py
-            else
-              cat > create_sections.py << 'EOF'
-with open('converted_files.txt', 'r', encoding='utf-8') as f:
-    items = []
-    for line in f:
-        parts = line.strip().split('|')
-        if len(parts) == 4:
-            orig, avif, orig_size, avif_size = parts
-            orig_size_int = int(orig_size)
-            avif_size_int = int(avif_size)
-            orig_readable = f"{orig_size_int / 1024 / 1024:.2f}MiB" if orig_size_int > 1024*1024 else f"{orig_size_int / 1024:.2f}KiB"
-            avif_readable = f"{avif_size_int / 1024 / 1024:.2f}MiB" if avif_size_int > 1024*1024 else f"{avif_size_int / 1024:.2f}KiB"
-            items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})")
-
-with open('README.md', 'a', encoding='utf-8') as f:
-    f.write("\n## 待修改\n")
-    for item in items:
-        f.write(item + "\n")
-    f.write("\n## 完成\n")
-EOF
-              python3 create_sections.py
-            fi
+            echo "::notice::No new conversions performed."
           fi
-      
-      - name: Commit changes
+
+      - name: 📤 Commit changes (if any)
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add .
-          git diff --staged --quiet || git commit -m "Convert images to AVIF format"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "feat: add new AVIF conversions to README"
+            git push
+          fi

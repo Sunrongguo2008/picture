@@ -1,0 +1,56 @@
+name: Cleanup originals after AVIF confirmation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cleanup originals
+        run: |
+          README="README.md"
+          TMPFILE=$(mktemp)
+
+          echo "🧹 Cleaning up checked items..."
+          # Extract checked lines
+          grep "^- \[x\]" "$README" | while read -r line; do
+            orig=$(echo "$line" | grep -oE "\`[^`]+\.(png|jpg|jpeg|webp)\`" | sed 's/`//g')
+            if [ -n "$orig" ] && [ -f "$orig" ]; then
+              echo "Deleting: $orig"
+              rm -f "$orig"
+            fi
+          done
+
+          # Move checked items to 完成区
+          awk '
+            BEGIN {in_todo=0; in_done=0}
+            /^## 待修改/ {in_todo=1; in_done=0; print; next}
+            /^## 完成/ {in_todo=0; in_done=1; print; next}
+            {
+              if (in_todo && $0 ~ /^\- \[x\]/) done = done $0 "\n";
+              else if (in_todo && $0 ~ /^\- \[ \]/) todo = todo $0 "\n";
+              else if (!in_todo && !in_done) other = other $0 "\n";
+              else if (in_done) done_section = done_section $0 "\n";
+            }
+            END {
+              print other;
+              print "## 待修改\n" todo;
+              print "## 完成\n" done_section done;
+            }
+          ' "$README" > "$TMPFILE" && mv "$TMPFILE" "$README"
+
+      - name: Commit and push cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add README.md
+            git commit -m "Cleanup originals after AVIF confirmation"
+            git push
+          else
+            echo "No changes to commit."
+          fi

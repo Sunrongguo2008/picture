@@ -66,9 +66,7 @@ jobs:
           COMPLETED=$(cat completed_items.txt)
           
           # 从"待修改"区域移除已勾选项,添加到"完成"区域
-          python3 << 'EOF'
-import re
-
+          cat > update_readme.py << 'PYTHON_SCRIPT'
 with open('README.md', 'r', encoding='utf-8') as f:
     content = f.read()
 
@@ -133,7 +131,9 @@ elif in_completed:
 
 with open('README.md', 'w', encoding='utf-8') as f:
     f.write('\n'.join(new_lines))
-EOF
+PYTHON_SCRIPT
+          
+          python3 update_readme.py
       
       - name: Commit changes
         run: |

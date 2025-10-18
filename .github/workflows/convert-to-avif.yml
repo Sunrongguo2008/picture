@@ -1,0 +1,34 @@
+name: Convert images to AVIF
+
+on:
+  workflow_dispatch:
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libavif-bin imagemagick jq
+
+      - name: Run conversion script
+        run: |
+          chmod +x scripts/convert_to_avif.sh
+          ./scripts/convert_to_avif.sh
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add README.md
+            git add . -- ':!node_modules' ':!.git' ':!.github'
+            git commit -m "Add AVIF conversions"
+            git push
+          else
+            echo "No changes to commit."
+          fi

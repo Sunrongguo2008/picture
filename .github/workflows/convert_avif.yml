@@ -96,7 +96,7 @@ jobs:
             avif_readable=$(numfmt --to=iec-i --suffix=B $avif_size)
             
             # 添加换行符
-            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})
+            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})"
 
           done < converted_files.txt
           

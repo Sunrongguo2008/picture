@@ -32,7 +32,7 @@ jobs:
           done
           
           # 查找所有图片文件并保存到临时文件
-          find . $EXCLUDE_ARGS -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -print > all_images.txt
+          eval "find . $EXCLUDE_ARGS -type f \( -iname \"*.png\" -o -iname \"*.jpg\" -o -iname \"*.jpeg\" -o -iname \"*.webp\" \) -print" > all_images.txt
           
           total=$(wc -l < all_images.txt)
           current=0
@@ -58,7 +58,7 @@ jobs:
               continue
             fi
             
-            # 获取原文件大小 (Ubuntu 使用 -c)
+            # 获取原文件大小 (Ubuntu 使用 stat -c%s)
             orig_size=$(stat -c%s "$file")
             
             echo "[$current/$total] 转换中: $file -> $avif_file"
@@ -91,17 +91,11 @@ jobs:
           # 准备待修改区内容
           PENDING_SECTION=""
           while IFS='|' read -r orig avif orig_size avif_size; do
-            # 跳过空行
-            if [ -z "$orig" ] || [ -z "$orig_size" ]; then
-              continue
-            fi
-            
             # 转换字节为可读格式
-            orig_readable=$(echo "$orig_size" | numfmt --to=iec-i --suffix=B)
-            avif_readable=$(echo "$avif_size" | numfmt --to=iec-i --suffix=B)
+            orig_readable=$(numfmt --to=iec-i --suffix=B $orig_size)
+            avif_readable=$(numfmt --to=iec-i --suffix=B $avif_size)
             
-            # 添加换行符
-            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})"
+            PENDING_SECTION="${PENDING_SECTION}- [ ] \`${orig}\` (${orig_readable}) -> \`${avif}\` (${avif_readable})"$'\n'
           done < converted_files.txt
           
           # 检查 README 是否存在
@@ -114,17 +108,41 @@ jobs:
           else
             # 检查是否已有"待修改"区域
             if grep -q "## 待修改" README.md; then
-              # 在"待修改"区域后插入新内容
-              awk -v new="$PENDING_SECTION" '
-                /## 待修改/ { print; print new; next }
-                { print }
-              ' README.md > README.md.tmp
-              mv README.md.tmp README.md
+              # 使用 Python 处理 README 更新
+              cat > update_readme_add.py << 'PYTHON_SCRIPT'
+import sys
+
+with open('README.md', 'r', encoding='utf-8') as f:
+    lines = f.readlines()
+
+with open('converted_files.txt', 'r', encoding='utf-8') as f:
+    new_items = []
+    for line in f:
+        parts = line.strip().split('|')
+        if len(parts) == 4:
+            orig, avif, orig_size, avif_size = parts
+            orig_readable = f"{int(orig_size) / 1024 / 1024:.2f}MB" if int(orig_size) > 1024*1024 else f"{int(orig_size) / 1024:.2f}KB"
+            avif_readable = f"{int(avif_size) / 1024 / 1024:.2f}MB" if int(avif_size) > 1024*1024 else f"{int(avif_size) / 1024:.2f}KB"
+            new_items.append(f"- [ ] `{orig}` ({orig_readable}) -> `{avif}` ({avif_readable})\n")
+
+new_lines = []
+added = False
+for i, line in enumerate(lines):
+    new_lines.append(line)
+    if line.strip() == '## 待修改' and not added:
+        new_lines.extend(new_items)
+        added = True
+
+with open('README.md', 'w', encoding='utf-8') as f:
+    f.writelines(new_lines)
+PYTHON_SCRIPT
+              python3 update_readme_add.py
             else
               # 添加新区域
               echo "" >> README.md
               echo "## 待修改" >> README.md
               echo "$PENDING_SECTION" >> README.md
+              echo "" >> README.md
               echo "## 完成" >> README.md
             fi
           fi

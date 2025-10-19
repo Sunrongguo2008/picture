@@ -14,7 +14,7 @@ in_todo_section=0
 
 echo "🧹 Cleaning up checked items..."
 
-while IFS= read -r line; do
+while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" == "## 待修改" ]]; then
         in_todo_section=1
         continue
@@ -26,7 +26,6 @@ while IFS= read -r line; do
 
     if [[ $in_todo_section -eq 1 ]]; then
         if echo "$line" | grep -q '^- \[x\]'; then
-            # 提取第一个反引号里的原图路径
             filepath=$(echo "$line" | awk -F'`' '{print $2}')
             fullpath="$REPO_DIR/$filepath"
             if [ -n "$filepath" ] && [ -f "$fullpath" ]; then

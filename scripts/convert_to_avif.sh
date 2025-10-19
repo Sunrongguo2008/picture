@@ -18,14 +18,23 @@ if ! grep -q "## 完成" "$README"; then
   echo -e "\n## 完成\n" >> "$README"
 fi
 
-# === Build find exclude arguments ===
-EXCLUDE_ARGS=()
+# === Build find command safely ===
+EXCLUDE_EXPR=()
 for dir in $EXCLUDE_DIRS; do
-  EXCLUDE_ARGS+=(-path "./$dir" -prune -o)
+  EXCLUDE_EXPR+=(-path "./$dir" -prune -o)
 done
 
+# 最后一组条件后加一个 -false 避免多余的 -o
+EXCLUDE_EXPR+=(-false)
+
 # === Find and convert images ===
-find . \( "${EXCLUDE_ARGS[@]}" \) -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) | while read -r file; do
+find . \( "${EXCLUDE_EXPR[@]}" \) -o -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) | while read -r file; do
+  # 跳过以 ./ 开头的 find 结果前缀，方便打印
+  file="${file#./}"
+
+  # 跳过空行
+  [ -z "$file" ] && continue
+
   avif="${file%.*}.avif"
 
   # Skip if AVIF already exists
@@ -36,6 +45,7 @@ find . \( "${EXCLUDE_ARGS[@]}" \) -type f \( -iname "*.png" -o -iname "*.jpg" -o
 
   # Convert
   echo "Converting: $file → $avif"
+  mkdir -p "$(dirname "$avif")"
   avifenc --min $QUALITY_MIN --max $QUALITY_MAX --speed $SPEED "$file" "$avif"
 
   # Get sizes

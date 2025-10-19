@@ -4,6 +4,7 @@ set -euo pipefail
 README="README.md"
 TMPFILE=$(mktemp)
 
+# 初始化变量
 todo_lines=""
 done_lines=""
 before_todo=""
@@ -23,21 +24,26 @@ while IFS= read -r line; do
     fi
 
     if [[ $in_todo_section -eq 1 ]]; then
-        # 使用 grep 判断，不用 [[ =~ ]]
+        # 已勾选条目
         if echo "$line" | grep -q '^- \[x\]'; then
-            # 提取文件路径
-            filepath=$(echo "$line" | sed -n 's/.*`\([^`]*\.\(png\|jpg\|jpeg\|webp\)\)`.*/\1/p')
+            # 提取原图路径（第一个反引号里的内容）
+            filepath=$(echo "$line" | awk -F'`' '{print $2}')
             if [ -n "$filepath" ] && [ -f "$filepath" ]; then
                 echo "Deleting: $filepath"
                 rm -f -- "$filepath"
+            else
+                echo "⚠️ File not found or path empty: $filepath"
             fi
             done_lines+="$line"$'\n'
+        # 未勾选条目
         elif echo "$line" | grep -q '^- \[ \]'; then
             todo_lines+="$line"$'\n'
         else
+            # 待修改区的其他行保留
             todo_lines+="$line"$'\n'
         fi
     else
+        # 待修改区外的内容保留
         before_todo+="$line"$'\n'
     fi
 done < "$README"

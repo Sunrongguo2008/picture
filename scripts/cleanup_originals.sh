@@ -4,6 +4,10 @@ set -euo pipefail
 README="README.md"
 TMPFILE=$(mktemp)
 
+todo_lines=""
+done_lines=""
+
+
 echo "🧹 Cleaning up checked items..."
 
 # ---- Delete original images listed as checked [x] ----

@@ -13,10 +13,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install dependencies (no man-db)
         run: |
-          sudo apt update
-          sudo apt install -y libavif-bin imagemagick jq
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends libavif-bin imagemagick jq
+          sudo rm -rf /var/lib/apt/lists/*
 
       - name: Run conversion script
         run: |

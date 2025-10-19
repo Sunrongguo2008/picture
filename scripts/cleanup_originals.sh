@@ -14,6 +14,7 @@ in_todo_section=0
 
 echo "🧹 Cleaning up checked items..."
 
+# 读取 README
 while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$line" == "## 待修改" ]]; then
         in_todo_section=1
@@ -25,6 +26,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     fi
 
     if [[ $in_todo_section -eq 1 ]]; then
+        # 已勾选条目
         if echo "$line" | grep -q '^- \[x\]'; then
             filepath=$(echo "$line" | awk -F'`' '{print $2}')
             fullpath="$REPO_DIR/$filepath"
@@ -35,6 +37,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
                 echo "⚠️ File not found: $fullpath"
             fi
             done_lines+="$line"$'\n'
+        # 未勾选条目
         elif echo "$line" | grep -q '^- \[ \]'; then
             todo_lines+="$line"$'\n'
         else

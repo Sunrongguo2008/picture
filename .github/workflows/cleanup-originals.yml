@@ -13,6 +13,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Normalize line endings for scripts
+        run: |
+          find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} + || true
+
+
       - name: Run cleanup script
         run: |
           chmod +x scripts/cleanup_originals.sh

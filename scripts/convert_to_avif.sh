@@ -26,38 +26,47 @@ is_excluded() {
   return 1
 }
 
-# === Find and convert images manually (no fancy find logic) ===
+# === Find all candidate images ===
 while IFS= read -r -d '' file; do
-  # Skip excluded paths
+  # Skip excluded directories
   if is_excluded "$file"; then
     continue
   fi
 
-  # Remove leading ./ for display
   file="${file#./}"
-
   avif="${file%.*}.avif"
 
-  # Skip if AVIF already exists
-  if [[ -f "$avif" ]]; then
-    echo "Skipping existing: $avif"
+  # --- Determine if already listed in README ---
+  if grep -q "\`${file}\`" "$README"; then
+    echo "Already listed in README: $file"
     continue
   fi
 
-  echo "Converting: $file → $avif"
-  mkdir -p "$(dirname "$avif")"
-  avifenc --min $QUALITY_MIN --max $QUALITY_MAX --speed $SPEED "$file" "$avif"
+  # --- Check if avif exists ---
+  avif_exists=false
+  if [[ -f "$avif" ]]; then
+    avif_exists=true
+  fi
 
+  # --- Convert if not existing ---
+  if [ "$avif_exists" = false ]; then
+    echo "Converting: $file → $avif"
+    mkdir -p "$(dirname "$avif")"
+    avifenc --min $QUALITY_MIN --max $QUALITY_MAX --speed $SPEED "$file" "$avif"
+  else
+    echo "AVIF already exists for: $file"
+  fi
+
+  # --- Compute sizes ---
   orig_size=$(du -h "$file" | cut -f1)
   new_size=$(du -h "$avif" | cut -f1)
 
-  # Avoid duplicate entries in README
-  if ! grep -q "\`${file}\`" "$README"; then
-    awk -v entry="- [ ] \`${file}\` (${orig_size}) -> \`${avif}\` (${new_size})" '
-      /^## 待修改/ {print; print entry; next}
-      1
-    ' "$README" > "$TMPFILE" && mv "$TMPFILE" "$README"
-  fi
+  # --- Add to README if not already listed ---
+  entry="- [ ] \`${file}\` (${orig_size}) -> \`${avif}\` (${new_size})"
+  awk -v entry="$entry" '
+    /^## 待修改/ {print; print entry; next}
+    1
+  ' "$README" > "$TMPFILE" && mv "$TMPFILE" "$README"
 
 done < <(find . -type f \( -iname "*.png" -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.webp" \) -print0)
 

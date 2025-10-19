@@ -1,34 +1,36 @@
-name: Cleanup originals after AVIF confirmation
+name: Cleanup Originals
 
 on:
-  workflow_dispatch:
-
-permissions:
-  contents: write
+  workflow_dispatch:  # 手动触发
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+
     steps:
+      # 完整 checkout 仓库，保证文件存在
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Normalize line endings for scripts
-        run: |
-          find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} + || true
+      # 打印文件确认路径
+      - name: List obsidian files
+        run: ls -R obsidian || echo "No obsidian folder"
 
-
-      - name: Run cleanup script
+      # 运行 cleanup 脚本
+      - name: Cleanup originals
         run: |
           chmod +x scripts/cleanup_originals.sh
           ./scripts/cleanup_originals.sh
 
-      - name: Commit and push cleanup
+      # 自动 commit 和 push README 修改
+      - name: Commit and push README
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
-            git add README.md
+            git add "$README"
             git commit -m "Cleanup originals after AVIF confirmation"
             git push
           else

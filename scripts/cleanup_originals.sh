@@ -3,7 +3,9 @@ set -euo pipefail
 
 README="README.md"
 TMPFILE=$(mktemp)
-REPO_DIR=$(pwd)  # 仓库根目录
+
+# 仓库根目录
+REPO_DIR=$(pwd)
 
 # 初始化变量
 todo_lines=""
@@ -27,25 +29,23 @@ while IFS= read -r line; do
     if [[ $in_todo_section -eq 1 ]]; then
         # 已勾选条目
         if echo "$line" | grep -q '^- \[x\]'; then
-            # 提取原图路径（第一个反引号里的内容）
+            # 提取第一个反引号里的原图路径
             filepath=$(echo "$line" | awk -F'`' '{print $2}')
             fullpath="$REPO_DIR/$filepath"
             if [ -n "$filepath" ] && [ -f "$fullpath" ]; then
                 echo "Deleting: $fullpath"
                 rm -f -- "$fullpath"
             else
-                echo "⚠️ File not found or path empty: $fullpath"
+                echo "⚠️ File not found: $fullpath"
             fi
             done_lines+="$line"$'\n'
         # 未勾选条目
         elif echo "$line" | grep -q '^- \[ \]'; then
             todo_lines+="$line"$'\n'
         else
-            # 待修改区的其他行保留
             todo_lines+="$line"$'\n'
         fi
     else
-        # 待修改区外的内容保留
         before_todo+="$line"$'\n'
     fi
 done < "$README"

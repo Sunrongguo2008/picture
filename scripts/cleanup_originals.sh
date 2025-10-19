@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+# --- 防止 Windows 换行符导致 awk 报错 ---
+dos2unix "$0" 2>/dev/null || sed -i 's/\r$//' "$0"
+
 README="README.md"
 TMPFILE=$(mktemp)
 

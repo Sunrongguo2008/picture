@@ -14,7 +14,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 打印文件确认路径
+      # 列出 obsidian 文件夹内容，调试路径
       - name: List obsidian files
         run: ls -R obsidian || echo "No obsidian folder"
 
@@ -24,15 +24,14 @@ jobs:
           chmod +x scripts/cleanup_originals.sh
           ./scripts/cleanup_originals.sh
 
-      # 自动 commit 和 push README 修改
-      - name: Commit and push README
+      # 自动 commit 和 push README
+      - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -n "$(git status --porcelain)" ]; then
-            git add "$README"
+            git add .
             git commit -m "Cleanup originals after AVIF confirmation"
             git push
           else
             echo "No changes to commit."
-          fi

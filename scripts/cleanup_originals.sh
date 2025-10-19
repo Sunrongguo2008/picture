@@ -7,15 +7,15 @@ TMPFILE=$(mktemp)
 # 初始化变量，防止 unbound variable
 todo_lines=""
 done_lines=""
+in_todo_section=0
+before_todo=""
+after_todo=""
 
 echo "🧹 Cleaning up checked items..."
 
-# Step 1: 分区提取 README
-before_todo=""
-after_todo=""
-in_todo_section=0
-
-while IFS= read -r line; do
+# 读取 README
+while IFS= read -r line || [ -n "$line" ]; do
+    # 判断区块标题
     if [[ "$line" =~ ^##\ 待修改 ]]; then
         in_todo_section=1
         continue  # 不把标题加入 before_todo
@@ -25,10 +25,10 @@ while IFS= read -r line; do
         continue
     fi
 
-    if [[ $in_todo_section -eq 1 ]]; then
-        # 待修改区行处理
+    if [ "${in_todo_section:-0}" -eq 1 ]; then
+        # 待修改区处理
         if [[ "$line" =~ ^-.\ \[x\] ]]; then
-            # 提取路径
+            # 提取原始文件路径
             filepath=$(echo "$line" | sed -n 's/.*`\([^`]*\.\(png\|jpg\|jpeg\|webp\)\)`.*/\1/p')
             if [ -n "$filepath" ] && [ -f "$filepath" ]; then
                 echo "Deleting: $filepath"
@@ -36,10 +36,10 @@ while IFS= read -r line; do
             fi
             done_lines+="$line"$'\n'
         elif [[ "$line" =~ ^-.\ \[ \] ]]; then
-            # 未勾选保留
+            # 未勾选条目保留
             todo_lines+="$line"$'\n'
         else
-            # 其他行保留在待修改区
+            # 待修改区的其他行也保留
             todo_lines+="$line"$'\n'
         fi
     else
@@ -48,13 +48,13 @@ while IFS= read -r line; do
     fi
 done < "$README"
 
-# Step 2: 检查 README 中是否已有完成区
+# 如果 README 没有 ## 完成 区，先创建
 if ! grep -q "^## 完成" "$README"; then
     after_todo="## 完成"$'\n'"$done_lines"$'\n'"$after_todo"
     done_lines=""
 fi
 
-# Step 3: 生成新的 README
+# 写回 README
 {
     printf "%s" "$before_todo"
     printf "## 待修改\n%s" "$todo_lines"

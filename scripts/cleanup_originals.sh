@@ -3,6 +3,7 @@ set -euo pipefail
 
 README="README.md"
 TMPFILE=$(mktemp)
+REPO_DIR=$(pwd)  # 仓库根目录
 
 # 初始化变量
 todo_lines=""
@@ -28,11 +29,12 @@ while IFS= read -r line; do
         if echo "$line" | grep -q '^- \[x\]'; then
             # 提取原图路径（第一个反引号里的内容）
             filepath=$(echo "$line" | awk -F'`' '{print $2}')
-            if [ -n "$filepath" ] && [ -f "$filepath" ]; then
-                echo "Deleting: $filepath"
-                rm -f -- "$filepath"
+            fullpath="$REPO_DIR/$filepath"
+            if [ -n "$filepath" ] && [ -f "$fullpath" ]; then
+                echo "Deleting: $fullpath"
+                rm -f -- "$fullpath"
             else
-                echo "⚠️ File not found or path empty: $filepath"
+                echo "⚠️ File not found or path empty: $fullpath"
             fi
             done_lines+="$line"$'\n'
         # 未勾选条目

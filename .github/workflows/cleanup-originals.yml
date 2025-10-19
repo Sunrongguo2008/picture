@@ -1,30 +1,26 @@
 name: Cleanup Originals
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
 
     steps:
-      # 完整 checkout 仓库，保证文件存在
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 列出 obsidian 文件夹内容，调试路径
       - name: List obsidian files
         run: ls -R obsidian || echo "No obsidian folder"
 
-      # 运行 cleanup 脚本
       - name: Cleanup originals
         run: |
           chmod +x scripts/cleanup_originals.sh
           ./scripts/cleanup_originals.sh
 
-      # 自动 commit 和 push README
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"

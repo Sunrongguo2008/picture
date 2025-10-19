@@ -3,6 +3,9 @@ name: Cleanup originals after AVIF confirmation
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   cleanup:
     runs-on: ubuntu-latest

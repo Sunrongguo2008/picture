@@ -1,6 +1,7 @@
 
 
 ## 待修改
+- [ ] `obsidian/20251030231238590.jpg` (3.8M) -> `obsidian/20251030231238590.avif` (1.1M)
 - [ ] `obsidian/202510030921156.png` (40K) -> `obsidian/202510030921156.avif` (12K)
 - [ ] `obsidian/202510030908788.png` (12K) -> `obsidian/202510030908788.avif` (4.0K)
 - [ ] `obsidian/202510030927580.png` (56K) -> `obsidian/202510030927580.avif` (16K)
